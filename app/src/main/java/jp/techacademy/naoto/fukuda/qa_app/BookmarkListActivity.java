@@ -29,18 +29,51 @@ import com.google.firebase.database.FirebaseDatabase;
 import java.util.ArrayList;
 import java.util.HashMap;
 
-public class MainActivity extends AppCompatActivity {
+public class BookmarkListActivity extends AppCompatActivity {
 
     private Toolbar mToolbar;
+    private int i = 1;
     private int mGenre = 0;
-
-    // --- ここから ---
     private DatabaseReference mDatabaseReference;
     private DatabaseReference mGenreRef;
     private ListView mListView;
-    private ArrayList<Question> mQuestionArrayList;
+    private DatabaseReference mBookmarkRef;
+    private DatabaseReference mQuestionRef;
+    private ArrayList<String> mBookmarkArrayList;
     private QuestionsListAdapter mAdapter;
+    private Question mQuestion;
+    private ArrayList<Question> mQuestionArrayList;
     private FirebaseUser user;
+
+    private ChildEventListener mBookmarkEventListener = new ChildEventListener() {
+        @Override
+        public void onChildAdded(DataSnapshot dataSnapshot, String s) {
+            HashMap bookmarkMap = (HashMap) dataSnapshot.getValue();
+            String BookmarkQid = (String) bookmarkMap.get("BookmarkQid");
+            mBookmarkArrayList.add(BookmarkQid);
+
+        }
+
+        @Override
+        public void onChildChanged(DataSnapshot dataSnapshot, String s) {
+
+        }
+
+        @Override
+        public void onChildRemoved(DataSnapshot dataSnapshot) {
+
+        }
+
+        @Override
+        public void onChildMoved(DataSnapshot dataSnapshot, String s) {
+
+        }
+
+        @Override
+        public void onCancelled(DatabaseError databaseError) {
+
+        }
+    };
 
     private ChildEventListener mEventListener = new ChildEventListener() {
         @Override
@@ -72,6 +105,86 @@ public class MainActivity extends AppCompatActivity {
             }
 
 
+            Question question = new Question(title, body, name, uid, dataSnapshot.getKey(), mGenre, bytes, answerArrayList);
+            if(mBookmarkArrayList.contains(dataSnapshot.getKey())){
+                mQuestionArrayList.add(question);
+            }
+
+            mAdapter.notifyDataSetChanged();
+        }
+
+        @Override
+        public void onChildChanged(DataSnapshot dataSnapshot, String s) {
+            HashMap map = (HashMap) dataSnapshot.getValue();
+
+            // 変更があったQuestionを探す
+            for (Question question: mQuestionArrayList) {
+                if (dataSnapshot.getKey().equals(question.getQuestionUid())) {
+                    // このアプリで変更がある可能性があるのは回答(Answer)のみ
+                    question.getAnswers().clear();
+                    HashMap answerMap = (HashMap) map.get("answers");
+                    if (answerMap != null) {
+                        for (Object key : answerMap.keySet()) {
+                            HashMap temp = (HashMap) answerMap.get((String) key);
+                            String answerBody = (String) temp.get("body");
+                            String answerName = (String) temp.get("name");
+                            String answerUid = (String) temp.get("uid");
+                            Answer answer = new Answer(answerBody, answerName, answerUid, (String) key);
+                            question.getAnswers().add(answer);
+                        }
+                    }
+
+                    mAdapter.notifyDataSetChanged();
+                }
+            }
+        }
+
+        @Override
+        public void onChildRemoved(DataSnapshot dataSnapshot) {
+
+        }
+
+        @Override
+        public void onChildMoved(DataSnapshot dataSnapshot, String s) {
+
+        }
+
+        @Override
+        public void onCancelled(DatabaseError databaseError) {
+
+        }
+    };
+
+    private ChildEventListener mQuestionEventListener = new ChildEventListener() {
+        @Override
+        public void onChildAdded(DataSnapshot dataSnapshot, String s) {
+            HashMap map = (HashMap) dataSnapshot.getValue();
+            String title = (String) map.get("title");
+            String body = (String) map.get("body");
+            String name = (String) map.get("name");
+            String uid = (String) map.get("uid");
+            String imageString = (String) map.get("image");
+            byte[] bytes;
+            if (imageString != null) {
+                bytes = Base64.decode(imageString, Base64.DEFAULT);
+            } else {
+                bytes = new byte[0];
+            }
+
+            ArrayList<Answer> answerArrayList = new ArrayList<Answer>();
+            HashMap answerMap = (HashMap) map.get("answers");
+            if (answerMap != null) {
+                for (Object key : answerMap.keySet()) {
+                    HashMap temp = (HashMap) answerMap.get((String) key);
+                    String answerBody = (String) temp.get("body");
+                    String answerName = (String) temp.get("name");
+                    String answerUid = (String) temp.get("uid");
+                    Answer answer = new Answer(answerBody, answerName, answerUid, (String) key);
+                    answerArrayList.add(answer);
+                }
+            }
+
+            Log.d("ANDROID", "mGenre D2=" + mGenre);
             Question question = new Question(title, body, name, uid, dataSnapshot.getKey(), mGenre, bytes, answerArrayList);
             mQuestionArrayList.add(question);
             mAdapter.notifyDataSetChanged();
@@ -119,22 +232,14 @@ public class MainActivity extends AppCompatActivity {
         }
     };
     // --- ここまで追加する ---
+    // --- ここまで追加する ---
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+        setContentView(R.layout.activity_bookmark_list);
         mToolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(mToolbar);
-
-        Log.d("ANDROID", "mGenre A1=" + mGenre);
-
-        /*if(mGenre != 0) {*/
-            Intent intent2 = getIntent();
-            mGenre = intent2.getIntExtra("genre",0); //デフォルト値設定してればクラッシュしない。
-
-
-        Log.d("ANDROID", "mGenre A2=" + mGenre);
 
         FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
         fab.setOnClickListener(new View.OnClickListener() {
@@ -194,30 +299,80 @@ public class MainActivity extends AppCompatActivity {
                     mGenre = 0;
                 }
 
-                Log.d("ANDROID", "mGenre B=" + mGenre);
+                Log.d("ANDROID", "mGenre D=" + mGenre);
 
-                //mGenreを渡して選択したジャンルのリスト生成。お気に入りを選んだ場合はBookmarkListActivityに遷移。
-                onCreateGenreList(mGenre);
+                // ログイン済みのユーザーを取得する
+                user = FirebaseAuth.getInstance().getCurrentUser();
+
+                DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
+                drawer.closeDrawer(GravityCompat.START);
+
+                if(mGenre != 0){ //mGenre == 1〜4
+
+                    Log.d("ANDROID", "mAdapter=" + mAdapter);
+
+                   /* // 質問のリストをクリアしてから再度Adapterにセットし、AdapterをListViewにセットし直す
+                    mQuestionArrayList.clear();
+                    mBookmarkArrayList.clear();
+                    mAdapter.setQuestionArrayList(mQuestionArrayList);
+                    mListView.setAdapter(mAdapter);
+
+                    // 選択したジャンルにリスナーを登録する
+                    if (mGenreRef != null) {
+                        mGenreRef.removeEventListener(mQuestionEventListener);
+                    }
+                    mGenreRef = mDatabaseReference.child(Const.ContentsPATH).child(String.valueOf(mGenre));
+                    mGenreRef.addChildEventListener(mQuestionEventListener);*/
+
+                    Intent intent2 = new Intent(getApplication(), MainActivity.class);
+                    Log.d("ANDROID", "mGenre D2=" + mGenre);
+                    intent2.putExtra("genre", mGenre);
+                    startActivity(intent2);
+
+                }/*else {//mGenre ==0 お気に入り選択
+                    // 質問のリストをクリアしてから再度Adapterにセットし、AdapterをListViewにセットし直す
+                    mQuestionArrayList.clear();
+                    mBookmarkArrayList.clear();
+                    mAdapter.setQuestionArrayList(mQuestionArrayList);
+                    mListView.setAdapter(mAdapter);
+                    Log.d("ANDROID", "mAdapter=" + mAdapter);
+
+                }*/
 
                 return true;
-            }
-        }); //setNavigationDrawer終わり。
 
-        // Firebase
+            }//onNavigationDrawerの終わり
+        });//setNavigationDrawerの終わり
+
+        // Firebase ログインしているuserを特定し、そのユーザーの全てのデータを取得しmDatabaseReferenceに格納。
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
         mDatabaseReference = FirebaseDatabase.getInstance().getReference();
+
+        //Firebase mBookmarkRefに、BookmarkPATH内の同ユーザー(user)のidがあるものを取得し格納。
+        mBookmarkRef = mDatabaseReference.child(Const.BookmarkPATH).child(user.getUid());
+        mBookmarkRef.addChildEventListener(mBookmarkEventListener);
+
+        //Firebase mQuestionRefに、mGenre = 1〜4までのQuestionを全て格納し、全ジャンルについてaddChildEventListenerを発動させる。
+        for(i = 1; i <=4; i++){
+            mQuestionRef = mDatabaseReference.child(Const.ContentsPATH).child(String.valueOf(i));
+            mQuestionRef.addChildEventListener(mEventListener);
+        }
 
         // ListViewの準備
         mListView = (ListView) findViewById(R.id.listView);
         mAdapter = new QuestionsListAdapter(this);
         mQuestionArrayList = new ArrayList<Question>();
+        mBookmarkArrayList = new ArrayList<String>();
         mAdapter.notifyDataSetChanged();
 
-        Log.d("ANDROID", "mGenre C=" + mGenre);
+        Log.d("ANDROID", "mGenre F=" + mGenre);
 
-        if(mGenre !=0) {
-            //BookmarkActivityから遷移した際に、onCreateGenreListメソッドでもらったmGenreの質問リストを出す。アプリ立ち上げ時はmGenre==0なので作動しない。
-            onCreateGenreList(mGenre);
-        }
+        // 質問のリストをクリアしてから再度Adapterにセットし、AdapterをListViewにセットし直す
+        mQuestionArrayList.clear();
+        mAdapter.setQuestionArrayList(mQuestionArrayList);
+        mListView.setAdapter(mAdapter);
+
+
 
         mListView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
@@ -229,7 +384,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-    } //onCreate終わり
+    }//onCreate終わり
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -249,50 +404,4 @@ public class MainActivity extends AppCompatActivity {
 
         return super.onOptionsItemSelected(item);
     }
-
-    //mGenreをもらって、選択したジャンルのリストを生成。お気に入りを選んだ場合はBookmarkListActivityに遷移。
-    public void onCreateGenreList(int mGenre) {
-        // ログイン済みのユーザーを取得する
-        user = FirebaseAuth.getInstance().getCurrentUser();
-        Log.d("ANDROID", "mGenre G=" + mGenre);
-        if (mGenre != 0) { //mGenre == 1〜4
-
-            Log.d("ANDROID", "mAdapter=" + mAdapter);
-
-            DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
-            drawer.closeDrawer(GravityCompat.START);
-
-            // 質問のリストをクリアしてから再度Adapterにセットし、AdapterをListViewにセットし直す
-            mQuestionArrayList.clear();
-            mAdapter.setQuestionArrayList(mQuestionArrayList);
-            mListView.setAdapter(mAdapter);
-
-            // 選択したジャンルにリスナーを登録する
-            if (mGenreRef != null) {
-                mGenreRef.removeEventListener(mEventListener);
-            }
-            mGenreRef = mDatabaseReference.child(Const.ContentsPATH).child(String.valueOf(mGenre));
-            mGenreRef.addChildEventListener(mEventListener);
-
-
-        } else { //mGenre ==0
-
-            if (user == null) {
-                // ログインしていなければログイン画面に遷移させる
-                Intent intent = new Intent(getApplicationContext(), LoginActivity.class);
-                startActivity(intent);
-            } else {
-                // BookmarkListActivity　お気に入りリストを起動する
-                // --- ここから ---
-                mToolbar.setTitle("お気に入り");
-                Intent intent = new Intent(getApplicationContext(), BookmarkListActivity.class);
-                startActivity(intent);
-                // --- ここまで ---
-            }
-
-
-        }
-    }
-
-
 }

@@ -37,7 +37,14 @@
         <activity android:name=".SettingActivity" />
         <activity android:name=".QuestionSendActivity" />
         <activity android:name=".QuestionDetailActivity" />
-        <activity android:name=".AnswerSendActivity"></activity>
+        <activity android:name=".AnswerSendActivity" />
+        <activity
+            android:name=".BookmarkListActivity"
+            android:label="@string/title_activity_list_bookmark"
+            android:theme="@style/AppTheme.NoActionBar"
+            >
+
+        </activity>
     </application>
 
 </manifest>

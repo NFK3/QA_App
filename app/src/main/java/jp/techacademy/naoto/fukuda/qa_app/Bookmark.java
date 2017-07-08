@@ -16,12 +16,13 @@ public class Bookmark implements Serializable {
 
     }
 
-
     public String getUid() {
+
         return mUid;
     }
 
     public String getQuestionUid() {
+
         return mQuestionUid;
     }
 

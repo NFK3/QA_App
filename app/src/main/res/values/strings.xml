@@ -2,6 +2,7 @@
     <string name="app_name">QA_App</string>
     <string name="action_settings">Settings</string>
     <string name="title_activity_login">Sign in</string>
+    <string name="title_activity_list_bookmark">お気に入り</string>
 
     <!-- Strings related to login -->
     <string name="prompt_email">Email</string>

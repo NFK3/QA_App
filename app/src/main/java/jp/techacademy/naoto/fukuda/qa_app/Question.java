@@ -12,6 +12,7 @@ public class Question implements Serializable {
     private int mGenre;
     private byte[] mBitmapArray;
     private ArrayList<Answer> mAnswerArrayList;
+    private boolean BookmarkFlag;
 
     public String getTitle() {
         return mTitle;
@@ -34,6 +35,11 @@ public class Question implements Serializable {
     }
     public int getGenre() {
         return mGenre;
+    }
+
+    public boolean getBookmarkFlag(){
+
+        return BookmarkFlag;
     }
 
     public byte[] getImageBytes() {
